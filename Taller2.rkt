@@ -1,288 +1,196 @@
 #lang eopl
-;; Gramática antes
-; <fnc-exp>  ::= 'FNC <natural> (<and-exp>)
-; <and-exp>  ::= <clausula> | ('and-exp <clausula> {'or <clausula>}*)
-; <clausula> ::= <literal> | ('or-exp <literal> {'or <literal>}*)
-; <literal>  ::= ('literal <entero-no-cero>)
 
-;; Gramática despues
-; <fnc-exp>  ::= ('FNC <natural> (<and-exp>))
-; <and-exp>  ::= <clausula> | (<clausula> {'and <clausula>}+)
-; <clausula> ::= <literal> | (<literal> {'or <literal>}+)
-; <literal>  ::= <entero-no-cero>
+;;; Gramática BNF
+;<fnc-exp>  ::= (FNC <natural> <and-exp>)
+;<and-exp>  ::= (and-simple <or-exp>) | (and-compuesto <or-exp> <and-exp>)
+;<or-exp>   ::= (or-simple <literal>) | (or-compuesto <literal> <or-exp>)
+;<literal>  ::= (lit-exp <entero-no-cero>)
 
-;______________________________________;
-;Gramatica actualll
-; <fnc-exp>  ::=  ('FNC <natural> <and-exp>)
-; <and-exp>  ::=  <clausula>
-;            ::=  (<clausula> 'and <and-exp>)
-; <clausula> ::=  (<or-exp>)
-; <or-exp>   ::=  <literal>
-;            ::=  <literal> 'or <or-exp>
-; <literal>  ::=  <entero-no-cero>
+;;; Implementación Basada en Listas ;;;
 
-;intenta representar esto
-; (FNC 1 (1)) 
-; (FNC 2 (1 or 2 or -1))
+;; Constructores
 
-; (FNC 2 ((1 or 2 or -1) and (2 or 1 or 2)))
+; Constructor de literal
+(define literal
+  (lambda (num)
+    (if (and (integer? num) (not (zero? num)))
+        (list 'lit-exp num)
+        (eopl:error "El literal debe ser un entero diferente de cero"))))
 
-
-
-; Definamos la interfaz, nuestro contrato
-; Constructores
-; fnc-exp: entero-no-cero x <and-exp> -> fnc-exp
-; and-simple: clausula -> and-exp
-; and-compuesto: clausula x and-exp -> and-exp
-; clausula-exp: or-exp -> clausula
-; or-simple: literal -> or-exp
-; or-compuesto: literal x or-exp -> or-exp
-; lit-exp: entero-no-cero -> literal
-
-
-(define lit-exp
-  (lambda (number)
-    (list 'literal number)
-    )
-  )
-
+; Constructores de OR
 (define or-simple
   (lambda (literal)
-    (list 'or-simple literal)
-    )
-  )
+    (list 'or-simple literal)))
 
 (define or-compuesto
   (lambda (literal or-exp)
     (list 'or-compuesto literal or-exp)))
 
-; usos 
-(or-compuesto (lit-exp 2) 
-               (or-compuesto (lit-exp 1) 
-                             (or-simple (lit-exp 2))))
-(or-simple (lit-exp 2))
-
-(or-compuesto (lit-exp 2) (lit-exp 2))
-;------
-
-(define clausula-exp
-  (lambda (or-exp)
-     (list 'clausula-exp or-exp)
-    )
-  )
-
-(clausula-exp (or-simple (lit-exp 2)))
-
+; Constructores de AND
 (define and-simple
-  (lambda (clausula)
-    (list 'and-simple clausula)
-    )
-  )
-
-(and-simple (clausula-exp (or-simple (lit-exp 2))))
-
+  (lambda (or-exp)
+    (list 'and-simple or-exp)))
 
 (define and-compuesto
-  (lambda (clausula and-exp)
-    (list 'and-compuesto clausula and-exp)
-    )
-  )
+  (lambda (or-exp and-exp)
+    (list 'and-compuesto or-exp and-exp)))
 
-(and-compuesto (clausula-exp (or-simple (lit-exp 2))) (and-simple (clausula-exp (or-simple (lit-exp 2))))
-)
-
+; Constructor de FNC
 (define fnc-exp
-  (lambda (entero-no-cero and-exp)
-    (list 'FNC entero-no-cero and-exp)
-    )
-  )
-
-(fnc-exp 3 (and-compuesto (clausula-exp (or-simple (lit-exp 2))) (and-simple (clausula-exp (or-simple (lit-exp 2))))
-))
-(fnc-exp 2 (and-simple (clausula-exp (or-simple (lit-exp 2)))))
-(fnc-exp 2 
-  (and-compuesto 
-    (clausula-exp (or-compuesto (literal 1) (or-simple (literal 2))))
-    (and-simple (clausula-exp (or-simple (literal -1))))))
+  (lambda (natural and-exp)
+    (list 'FNC natural and-exp)))
 
 
+;; Predicados - Las hice de manera sensilla pq no se piden, pero ya para algo más estricto, tocaría verificar sus elementos
 
-
-;;;; Implementación Basada en Listas ;;;;
-
-;;; Constructores
-
-;; Constructor de Literal
-(define literal
-  (lambda (value)
-    (list 'literal value)
-    ))
-
-;; Constructor de OR (clausula)
-(define or-exp
-  (lambda (var-list)
-    (define add-ors
-      (lambda (var-list)
-        (if (null? (cdr var-list))
-            (list (car var-list))
-            (cons (car var-list)(cons 'or (add-ors (cdr var-list))))
-            )
-        )
-      )
-    (cond
-      [(null? var-list) (eopl:error "Una clasúla debe contener al menos un literal")]
-      [(null? (cdr var-list)) (list 'or-exp (car var-list))]
-      [else (cons 'or-exp (add-ors var-list))]
-      )
-     )
-  )
-
-;; Constructor de AND (lista de clausulas - or-exp)
-(define and-exp
-  (lambda (or-list)
-    (define add-ands
-      (lambda (var-list)
-        (if (null? (cdr var-list))
-            (list (car var-list))
-            (cons (car var-list)(cons 'and (add-ands (cdr var-list))))
-            )
-        )
-      )
-    (cond
-      [(null? or-list) (eopl:error "Una expresión AND debe contener al menos una expresion")]
-      [(null? (cdr or-list)) (list 'and-exp (car or-list))]
-      [else (cons 'and-exp (add-ands or-list))]
-      )
-     )
-  )
-
-;; Constructor de fnc
-; and-exp : estrctura and 
-;(define fnc-exp
-;  (lambda (and-exp)
- ;   (list 'FNC count-vars(and-exp) and-exp)
-;    )
- ; )
-
-;; Funciones auxiliares
-
-;; count-vars :
-;; Proposito:
-;; and-exp -> int : Procedimiento que para una expresión and retorna el número de variables
-;; booleanas distintas que se emplean
-; <and-exp>  ::= <clausula> | ('and-exp <clausula> {'or <clausula>}*)
-; <clausula> ::= <literal> | ('or-exp <literal> {'or <literal>}*)
-; <literal>  ::= ('literal <entero-no-cero>)
-
-(define count-vars
-  (lambda (exp)
-    (cond
-      [(or (null? exp) (not (list? exp))) 0]
-      [(eqv? (car exp) 'and-exp) (sum-list (map count-vars (cdr exp)))]
-      [(eqv? (car exp) 'or-exp) (sum-list (map count-vars (cdr exp)))]
-      [(eqv? (car exp) 'literal) 1]
-      [else 0]
-      )))
-
-
-;; sum-list :
-;; Proposito:
-;; int-list -> int : Procedimiento que para una lista de enteros retorna el valor de la suma de
-;;                   todos sus elementos
-
-(define sum-list
-  (lambda (list)
-    (if (null? list)
-        0
-        (+ (car list) (sum-list (cdr list)))
-        )
-    )
-  )
-
-
-;; is-in? :
-;; Proposito:
-;; Scheme-Value x List -> Bool : Procedimiento que para una lista y un valor, retorna #t si el
-;;                               valor hace parte de los elementos de la lista y #f de lo contrario
-(define is-in?
-  (lambda (val list)
-    (if (null? list)
-        #f
-        (or (eqv? (car list) val) (is-in? val (cdr list)))
-        )
-    )
-  )
-
-;;; Predicados
-
+; Predicado de FNC
 (define fnc-exp?
   (lambda (exp)
     (and (list? exp)
          (not (null? exp))
          (eqv? (car exp) 'FNC))))
 
-(define or-exp?
-  (lambda (exp)
-    (and (list? exp)
-         (not (null? exp))
-         (eqv? (car exp) 'or-exp))))
-
-(define and-exp?
+; Predicados de AND 
+(define and-compuesto?
   (lambda (exp)
     (and (list? exp)         
          (not (null? exp))   
-         (eqv? (car exp) 'and-exp))))
+         (eqv? (car exp) 'and-compuesto))))
+
+(define and-simple?
+  (lambda (exp)
+    (and (list? exp)         
+         (not (null? exp))   
+         (eqv? (car exp) 'and-simple))))
+
+; Predicados de OR
+(define or-compuesto?
+  (lambda (exp)
+    (and (list? exp)         
+         (not (null? exp))   
+         (eqv? (car exp) 'or-compuesto))))
+
+(define or-simple?
+  (lambda (exp)
+    (and (list? exp)         
+         (not (null? exp))   
+         (eqv? (car exp) 'or-simple))))
+
+; Predicado de literal
+(define lit-exp?
+  (lambda (exp)
+    (and (list? exp)
+         (not (null? exp))
+         (eqv? (car exp) 'lit-exp)
+         (integer? (cadr exp))
+         (not (zero? (cadr exp))))))
 
 
-;;; Extractores
+;; Extractores
 
-;; Variables de la fnc
+; Extractores de FNC
 (define fnc->var
   (lambda (exp)
     (cadr exp)))
 
-;; Clausulas de la fnc
-(define fnc->clausulas
+(define fnc->and-exp
   (lambda (exp)
-  (caddr exp)))
+    (caddr exp)))
 
-;; Variables de una clausula OR
-(define or->varlist
-  (lambda (clausula)
-    (cadr clausula)))
+; Extractores de AND compuesto
+(define and-compuesto->or-exp
+  (lambda (exp)
+    (cadr exp)))
+
+(define and-compuesto->and-exp
+  (lambda (exp)
+    (caddr exp)))
+
+; Extractor de AND simple
+(define and-simple->or-exp
+  (lambda (exp)
+    (cadr exp)))
+
+; Extractores de OR compuesto
+(define or-compuesto->literal
+  (lambda (exp)
+    (cadr exp)))
+
+(define or-compuesto->or-exp
+  (lambda (exp)
+    (caddr exp)))
+
+; Extractor de OR Simple
+(define or-simple->literal
+  (lambda (exp)
+    (cadr exp)))
+
+; Extractor de literal
+(define lit-exp->num
+  (lambda (exp)
+    (cadr exp)))
 
 
-;; Variables de una lista de clausulas AND
-(define and->clausulas
-  (lambda (and-exp)
-    (cadr and-exp)))
+;; Definición de Instancias
 
-;;; Definición de Instancias
+; Instancia 1 - FNC 2 ((1 or 2) and (-1) and (-2))
+(define instancia-1
+  (fnc-exp 2
+           (and-compuesto (or-compuesto (literal 1) (or-simple (literal 2)))
+                          (and-compuesto (or-simple (literal -1))
+                                         (and-simple (or-simple (literal -2)))))))
 
-;; Instancia 1 - FNC 2 ((1 or 2) and (-1) and (-2))
+; Instancia 2 - FNC 3 ((3 or -1) and (-3) and (-2))
+(define instancia-2
+  (fnc-exp 3
+           (and-compuesto (or-compuesto (literal 3) (or-simple (literal -1)))
+                          (and-compuesto (or-simple (literal -3))
+                                         (and-simple (or-simple (literal -2)))))))
+
+; Instancia 3 - FNC 4 ((1 or -2 or 3) and (-1 or 4) and (2))
+(define instancia-3
+  (fnc-exp 4
+           (and-compuesto (or-compuesto (literal 1)
+                                        (or-compuesto (literal -2) (or-simple (literal 3))))
+                          (and-compuesto (or-compuesto (literal -1) (or-simple (literal 4)))
+                                         (and-simple (or-simple (literal 2)))))))
 
 
-;; Instancia 2 - FNC 4 (1 or -2 or 3 or 4) and (-2 or 3) and (-1 or -2 or -3) and (3 or 4) and (2))
+;; Ejemplos
 
+;; Probando predicados
 
-;; Instancia 3 - FNC 3 ((3 or -1) and (-3) and (-2))
+(fnc-exp? instancia-1)
+(fnc-exp? instancia-2)
+(fnc-exp? instancia-3)
+ 
+(lit-exp? (literal 1))
+(lit-exp? (literal -1))
+(lit-exp? '(lit-exp 0))
 
+; Verificar si la primera cláusula del AND en instancia-1 es un OR compuesto
+(or-compuesto? (and-compuesto->or-exp (fnc->and-exp instancia-1)))
 
+; Verificar si la segunda cláusula de la instancia-2 es un OR simple
+(or-simple? (and-compuesto->or-exp (and-compuesto->and-exp (fnc->and-exp instancia-2))))
 
-;;; Ejemplos
-
-;; Probando predicados (innecesario pero quería ajajja)
-(fnc-exp? '())
-(fnc-exp? '())
-(fnc-exp? '())
+; Verificar si el final de la instancia-1 cierra correctamente con un AND simple
+(and-simple? (and-compuesto->and-exp (and-compuesto->and-exp (fnc->and-exp instancia-1))))
 
 ;; Probando extractores
-(fnc->var '(FNC 0))
-(fnc->var '(FNC 0))
-(fnc->clausulas '(FNC 0 '()))
-(or->varlist '('or-exp '()))
-(or->varlist '('or-exp '()))
+
+; Extraer número de variables en la instancia-3
+(fnc->var instancia-3)
+
+; Extraer primer número de la instancia-2
+(lit-exp->num (or-compuesto->literal (and-compuesto->or-exp (fnc->and-exp instancia-2))))
+
+; Extraer último número de la primera cláusula de la instancia-3
+(lit-exp->num (or-simple->literal (or-compuesto->or-exp (or-compuesto->or-exp (and-compuesto->or-exp (fnc->and-exp instancia-3))))))
+
+; Extraer el ultimo número de toda la instancia-1
+(lit-exp->num (or-simple->literal (and-simple->or-exp (and-compuesto->and-exp (and-compuesto->and-exp (fnc->and-exp instancia-1))))))
 
 
 
-
+;;; Implementación Basada en Datatypes ;;;
