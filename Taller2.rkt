@@ -6,6 +6,12 @@
 ;<or-exp>   ::= (or-simple <literal>) | (or-compuesto <literal> <or-exp>)
 ;<literal>  ::= (lit-exp <entero-no-cero>)
 
+; Función auxiliar (predicado) para validar naturales
+(define natural?
+  (lambda (x)
+    (and (integer? x)
+         (>= x 0))))
+
 ;;; Implementación Basada en Listas ;;;
 
 ;; Constructores
@@ -38,7 +44,9 @@
 ; Constructor de FNC
 (define fnc-exp
   (lambda (natural and-exp)
-    (list 'FNC natural and-exp)))
+    (if (natural? natural)
+        (list 'FNC natural and-exp)
+        (eopl:error "El número de variables debe ser un número natural (>= 0)"))))
 
 
 ;; Predicados - Las hice de manera sensilla pq no se piden, pero ya para algo más estricto, tocaría verificar sus elementos
@@ -194,3 +202,71 @@
 
 
 ;;; Implementación Basada en Datatypes ;;;
+; Datatype de literal
+(define-datatype dt-literal dt-literal? ; No puedo colocar literal pq genera error debido a q ya fue definido
+  (dt-lit-exp
+   (num integer?)))
+
+; Datatype para or-exp
+(define-datatype dt-or-exp dt-or-exp?
+  (dt-or-simple (literal dt-literal?))
+  (dt-or-compuesto (literal dt-literal?)
+                   (resto dt-or-exp?)))
+
+; Datatype para and-exp
+(define-datatype dt-and-exp dt-and-exp?
+  (dt-and-simple (or-exp dt-or-exp?))
+  (dt-and-compuesto (or-exp dt-or-exp?)
+                    (resto dt-and-exp?)))
+
+; Datatype para fnc-exp
+(define-datatype dt-fnc-exp dt-fnc-exp?
+  (FNC
+   (vars natural?)
+   (and-exp dt-and-exp?)))
+
+
+;; Definición de Instancias
+
+; Instancia 1 - FNC 2 ((1 or 2) and (-1) and (-2))
+(define datatype-instancia-1
+  (FNC 2
+       (dt-and-compuesto (dt-or-compuesto (dt-lit-exp 1) (dt-or-simple (dt-lit-exp 2)))
+                         (dt-and-compuesto (dt-or-simple (dt-lit-exp -1))
+                                           (dt-and-simple (dt-or-simple (dt-lit-exp -2)))))))
+
+; Instancia 2 - FNC 3 ((3 or -1) and (-3) and (-2))
+(define datatype-instancia-2
+  (FNC 3
+       (dt-and-compuesto (dt-or-compuesto (dt-lit-exp 3) (dt-or-simple (dt-lit-exp -1)))
+                         (dt-and-compuesto (dt-or-simple (dt-lit-exp -3))
+                                           (dt-and-simple (dt-or-simple (dt-lit-exp -2)))))))
+
+; Instancia 3 - FNC 4 ((1 or -2 or 3) and (-1 or 4) and (2))
+(define datatype-instancia-3
+  (FNC 4
+       (dt-and-compuesto (dt-or-compuesto (dt-lit-exp 1)
+                                          (dt-or-compuesto (dt-lit-exp -2) (dt-or-simple (dt-lit-exp 3))))
+                         (dt-and-compuesto (dt-or-compuesto (dt-lit-exp -1) (dt-or-simple (dt-lit-exp 4)))
+                                           (dt-and-simple (dt-or-simple (dt-lit-exp 2)))))))
+
+
+;; Ejemplos de utilización
+
+; Probando predicados automaticos
+(dt-fnc-exp? datatype-instancia-1)
+(dt-fnc-exp? datatype-instancia-2)
+(dt-fnc-exp? datatype-instancia-3)
+(dt-fnc-exp? 5)
+(dt-literal? (dt-lit-exp -4))
+(dt-or-exp? (dt-or-simple (dt-lit-exp 2)))
+
+; Extrayendo info 
+
+; Extraer número de variables en la instancia-3
+(cases dt-fnc-exp datatype-instancia-3
+   (FNC (vars and-exp) vars))
+
+; Extraer el número de un literal directo
+(cases dt-literal (dt-lit-exp 8)
+  (dt-lit-exp (num) num))
