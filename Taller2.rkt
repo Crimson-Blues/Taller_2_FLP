@@ -270,3 +270,100 @@
 ; Extraer el número de un literal directo
 (cases dt-literal (dt-lit-exp 8)
   (dt-lit-exp (num) num))
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;parser basoado en listas (PARSEBNF)
+
+(define PARSE-OR-EXP
+  (lambda (exp)
+    (cond
+      ((null? (cdr exp))
+       (or-simple (literal (car exp))))
+      ((eqv? (cadr exp) 'or)
+       (or-compuesto (literal (car exp))
+                     (PARSE-OR-EXP (cddr exp))))
+      (else
+       (eopl:error "Sintaxis inválida en expresión OR")))))
+
+; Parser recursivo para arreglos de AND; '((1 or 2) and (3))
+(define PARSE-AND-EXP
+  (lambda (exp)
+    (cond
+      ((null? (cdr exp)) 
+       (and-simple (PARSE-OR-EXP (car exp))))
+      ((eqv? (cadr exp) 'and)
+       (and-compuesto (PARSE-OR-EXP (car exp))
+                      (PARSE-AND-EXP (cddr exp))))
+      (else
+       (eopl:error "Sintaxis inválida en expresión AND")))))
+
+; Parser principal para instancias FNC (PARSEBNF)
+(define PARSEBNF
+  (lambda (exp)
+    (if (and (list? exp) (not (null? exp)) (eqv? (car exp) 'FNC))
+        (fnc-exp (cadr exp)
+                 (PARSE-AND-EXP (caddr exp)))
+        (eopl:error "Sintaxis inválida para FNC"))))
+
+;; Pruebas del parser
+(PARSEBNF '(FNC 3 ((1 or 2) and (-1) and (-2))))
+(PARSEBNF '(FNC 4 ((1 or -2 or 3) and (-1 or 4) and (2))))
+(PARSEBNF '(FNC 4 ((1 or -2 or 3 or 4) and (-2 or 3) and
+(-1 or -2 or -3) and (3 or 4) and ( 2 ) )))
+
+;;;;;;;;;;;;;;;;
+;;; (UNPARSEBNF) 
+
+; Unparser recursivo para OR
+(define UNPARSE-OR-EXP
+  (lambda (ast)
+    (cond
+      ((or-simple? ast)
+       (list (lit-exp->num (or-simple->literal ast))))
+      ((or-compuesto? ast)
+       (cons (lit-exp->num (or-compuesto->literal ast))
+             (cons 'or (UNPARSE-OR-EXP (or-compuesto->or-exp ast)))))
+      (else
+       (eopl:error "AST inválido para expresión OR")))))
+
+; Unparser recursivo para AND
+(define UNPARSE-AND-EXP
+  (lambda (ast)
+    (cond
+      ((and-simple? ast)
+       (list (UNPARSE-OR-EXP (and-simple->or-exp ast))))
+      ((and-compuesto? ast)
+       (cons (UNPARSE-OR-EXP (and-compuesto->or-exp ast))
+             (cons 'and (UNPARSE-AND-EXP (and-compuesto->and-exp ast)))))
+      (else
+       (eopl:error "AST inválido para expresión AND")))))
+
+; Unparser principal (UNPARSEBNF)
+(define UNPARSEBNF
+  (lambda (ast)
+    (if (fnc-exp? ast)
+        (list 'FNC 
+              (fnc->var ast) 
+              (UNPARSE-AND-EXP (fnc->and-exp ast)))
+        (eopl:error "El AST no es una FNC válida"))))
+
+;; Pruebas
+(UNPARSEBNF '(FNC
+ 4
+ (and-compuesto
+  (or-compuesto
+   (lit-exp 1)
+   (or-compuesto (lit-exp -2) (or-simple (lit-exp 3))))
+  (and-compuesto
+   (or-compuesto (lit-exp -1) (or-simple (lit-exp 4)))
+   (and-simple (or-simple (lit-exp 2)))))))
+(UNPARSEBNF (PARSEBNF '(FNC 3 ((1 or 2) and (-1) and (-2)))))
+(UNPARSEBNF instancia-1)
+(UNPARSEBNF (PARSEBNF '(FNC 4 ((1 or -2 or 3 or 4) and (-2 or 3) and
+(-1 or -2 or -3) and (3 or 4) and ( 2 ) )))
+)
+
+
