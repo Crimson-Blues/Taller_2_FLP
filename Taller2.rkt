@@ -1,5 +1,9 @@
 #lang eopl
 
+;Liseth Natalia Rivera Cordoba - 2223510
+;Juan Diego Cardenas Mejia - 2416437
+;Grosman Klein García Valencia - 2340247
+
 ;; Declaración de uso de IA:
 ;; Se utilizó IA para: Mejorar la redacción de documentación y comprender
 ;; algunos mensajes de error del intérprete
