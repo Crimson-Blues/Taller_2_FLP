@@ -401,6 +401,7 @@
                             
                         )
                             ]
+      [else (eopl:error "Expresión no es una FNC válida")]
       )
     )
   )
