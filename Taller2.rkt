@@ -12,7 +12,7 @@
     (and (integer? x)
          (>= x 0))))
 
-;;; Implementación Basada en Listas ;;;
+;;; 1.1 Implementación Basada en Listas ;;;
 
 ;; Constructores
 
@@ -201,7 +201,7 @@
 
 
 
-;;; Implementación Basada en Datatypes ;;;
+;;; 1.2 Implementación Basada en Datatypes ;;;
 ; Datatype de literal
 (define-datatype dt-literal dt-literal? ; No puedo colocar literal pq genera error debido a q ya fue definido
   (dt-lit-exp
@@ -270,3 +270,125 @@
 ; Extraer el número de un literal directo
 (cases dt-literal (dt-lit-exp 8)
   (dt-lit-exp (num) num))
+
+;;; 3. Evaluación de instancias SAT ;;;
+
+
+;; probarEXP :
+;; Proposito:
+;; Recibe una expresión y una lista de valores booleanos que es de igual longitud
+;; que el número de variables en la totalidad de la expresión. Reemplaza por orden
+;; las instancias de las variables en la expresión y retorna su valor de verdad.
+
+;; <fnc-exp>  ::= (FNC <natural> <and-exp>)
+;; <and-exp>  ::= (and-simple <or-exp>) | (and-compuesto <or-exp> <and-exp>)
+;; <or-exp>   ::= (or-simple <literal>) | (or-compuesto <literal> <or-exp>)
+;; <literal>  ::= (lit-exp <entero-no-cero>)
+
+(define probarEXP
+  (lambda (exp vars)
+    (cond
+      [(fnc-exp? exp) (probarEXP (fnc->and-exp exp) vars)]
+      [(and-compuesto? exp) (and (probarEXP (and-compuesto->or-exp exp) vars)
+                                 (probarEXP (and-compuesto->and-exp exp) vars))]
+      [(and-simple? exp) (probarEXP (and-simple->or-exp exp) vars)]
+      [(or-compuesto? exp) (or (probarEXP (or-compuesto->literal exp) vars)
+                                 (probarEXP (or-compuesto->or-exp exp) vars))]
+      [(or-simple? exp) (probarEXP (or-simple->literal exp) vars)]
+      [(lit-exp? exp) (let (
+                            [bool-var (list-ref vars (- (abs (lit-exp->num exp)) 1))]
+                            [num (lit-exp->num exp)]
+                            )
+                        (if (> num 0)
+                            bool-var
+                            (not bool-var))
+                            
+                        )
+                            ]
+      )
+    )
+  )
+
+;; Ejemplos de utilización
+;; Formula insatisfactible
+(probarEXP instancia-1 '(#t #t))
+(probarEXP instancia-1 '(#t #f))
+
+;; Fórmula satisfactible
+(probarEXP instancia-2 '(#f #f #f))
+(probarEXP instancia-2 '(#f #t #f))
+
+
+
+;; bool-comb :
+;; Proposito:
+;; Recibe un numero natural n y retorna una lista de n-tuplas de valores booleanos
+;; correspondiente a todos las permutaciones posibles de valores de verdad.
+
+;; <natural>  ::= <zero> | sucesor(<natural>)
+
+(define bool-comb
+  (lambda (n)
+    (if (zero? n)
+        '(())
+        (let (
+              [cons-bool (lambda (bool)
+                           (lambda (list)
+                             (cons bool list)))])
+          (append
+           (map (cons-bool #t) (bool-comb (- n 1)))
+           (map (cons-bool #f) (bool-comb (- n 1))))
+          )
+        )
+    )
+  )
+
+;; Ejemplos de utilización
+;; Caso base n = 0
+(bool-comb 0)
+
+;; Casos de uso común
+(bool-comb 3)
+(bool-comb 4)
+
+;; EVALUARSAT :
+;; Proposito:
+;; Recibe una expresión FNC y retorna si es insatisfactible u satisfactible,
+;; junto con la primera permutación de valores de verdad hallada que resulte
+;; en su satisfactibilidad.
+
+;; <fnc-exp>  ::= (FNC <natural> <and-exp>)
+;; <and-exp>  ::= (and-simple <or-exp>) | (and-compuesto <or-exp> <and-exp>)
+;; <or-exp>   ::= (or-simple <literal>) | (or-compuesto <literal> <or-exp>)
+;; <literal>  ::= (lit-exp <entero-no-cero>)
+
+(define EVALUARSAT
+  (lambda (fnc-exp)
+    (define EVALUARACC
+      (lambda (fnc-exp bool-list)
+       (if (null? bool-list)
+       (list 'insatisfactible '())
+       (let ([test (probarEXP fnc-exp (car bool-list))])
+         (cond
+           [(eqv? test #t) (list 'satisfactible (car bool-list))]
+           [(eqv? test #f) (EVALUARACC fnc-exp (cdr bool-list))]
+           )
+         ))
+        )
+      )
+    (EVALUARACC fnc-exp (bool-comb (fnc->var fnc-exp)))
+    )
+  )
+
+;; Ejemplos de utilización
+;;; Instancias ya creadas
+
+;; Fórmula insatisfactible
+(EVALUARSAT instancia-1)
+
+;; Fórmula satisfactible
+;; De tres variables
+(EVALUARSAT instancia-2)
+
+;; De cuatro variables
+(EVALUARSAT instancia-3)
